@@ -1,21 +1,28 @@
+/** This creates a random flow field using my noise implementation
+  * and then uses OpenGL to render particles that travel in said flow field */
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <ctime>
 #include <cmath>
 #include <shader.h>
-#include <noise.h>
+#include <noise.h> // My noise implementation
 #include <random>
 
 const int W = 1366;
 const int H = 768;
-const int xSize = 112;
-const int ySize = 64;
-const double frameStep = 0.0001;
-const double axisStep = 0.01;
-const int lineCount = 10000;
-const double maxVel = 0.001;
+const int xSize = 112; // Amount of vectors along x
+const int ySize = 64; // Amount of vectors along y
+const double frameStep = 0.0001; // Determines how fast the "z-axis" of the noise changes
+const double axisStep = 0.01; // Magnitude of x and y axis of noise
+const int lineCount = 10000; // How many particles
+const double maxVel = 0.001; // Max velocity of particles
 const double pi = 3.1415926535;
 
+/** A bare minimum vector class 
+  * Capable of creating a vector 1/10th of 
+  * maxVel in magnitude from a given angle 
+  * operator+= is used to move particles */
 class Vector{
 public:
 	GLfloat x, y;
@@ -36,6 +43,8 @@ public:
 	}
 };
 
+/** Line struct used to pass line vertices to 
+  * graphics card through vbo */
 struct Line{
 	GLfloat x1;
 	GLfloat y1;
@@ -43,11 +52,15 @@ struct Line{
 	GLfloat y2;
 };
 
+/** Lines class to keep track of all particles
+  * Named Lines since a particle is a line to OpenGL */
 class Lines{
 public:
-	Line *lines;
-	Vector *vels;
+	Line *lines; // Particles
+	Vector *vels; // Current velocities
 	int size;
+	
+	/** Creates count number of particles and gives then random positions */
 	Lines(int count): size(count){
 		std::mt19937 rand(time(0));
 		lines = new Line[count];
@@ -57,6 +70,9 @@ public:
 			lines[i].y1 = lines[i].y2 = (float)rand()*2/rand.max()-1.0;
 		}
 	}
+	
+	/** Updates all particles according to flow field 
+	  * param: vectors - flow field vectors */
 	void update(Vector **vectors){
 		for(int i=0, x, y; i<size; ++i){
 			// cout << lines[i].x1 << ", " << lines[i].y1 << " -> ";
@@ -88,16 +104,20 @@ public:
 			// cout << lines[i].x1 << ", " << lines[i].y1 << " <- " << lines[i].x2 << ", " << lines[i].y2 << endl;
 		}
 	}
+	
+	/** Just a little helper for updating previous particle positions */
 	void setPrev(int index){
 		lines[index].x2 = lines[index].x1;
 		lines[index].y2 = lines[index].y1;
 	}
+	
 	~Lines(){
 		delete[] lines;
 		delete[] vels;
 	}
 };
 
+/** Key callback for closing window when esc is pressed */
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mode){
 	if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(window, GL_TRUE);
 }
@@ -121,7 +141,7 @@ int main(){
 
 	Lines particles(lineCount);
 
-	GLuint vao, vbo;
+	GLuint vao, vbo; // Make OpenGL vertex buffer and vertex array
 	glGenBuffers(1, &vbo);
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
@@ -136,67 +156,28 @@ int main(){
 	Vector **vectors = new Vector*[ySize];
 	for(int i=0; i<ySize; ++i) vectors[i] = new Vector[xSize];
 
-	shader sp("vertex.shader", "fragment.shader");
+	shader sp("vertex.shader", "fragment.shader"); // Shader program
 
 	sp.use();
-
-	/*std::mt19937 rand(time(0));
-	double firstAngle = (double)rand()/rand.max()*2*pi;
-	vectors[0][0].setAngle(firstAngle);
-	for(int i=0; i<ySize; ++i){
-		for(int j=1; j<xSize; ++j){
-			int count = 0;
-			double total = 0;
-			for(int x = -1; x<=1; ++x){
-				for(int y = -1; y<=1; ++y){
-					if((x != 0 || y != 0) && i+x >= 0 && i+x < ySize && j+y >= 0 && j+y < xSize){
-						++count;
-						total += vectors[i+x][j+y].angle;
-					}
-				}
-			}
-			total /= count;
-			vectors[i][j] = total + ((double)rand()/rand.max()*2-1)*change;
-		}
-	}*/
+	
 	int frames = 0;
-	glEnable(GL_ALPHA_TEST);
+	glEnable(GL_ALPHA_TEST); // enable alpha test and blending
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glClearColor(1.0, 1.0, 1.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 	while(!glfwWindowShouldClose(window)){
 		glfwPollEvents();
-		/*glClearColor(1.0, 1.0, 1.0, 1.0);
-		glClear(GL_COLOR_BUFFER_BIT);*/
-		/*firstAngle = (double)rand()/rand.max()*2*pi;
-		vectors[0][0].setAngle(firstAngle);
 		for(int i=0; i<ySize; ++i){
-			for(int j=1; j<xSize; ++j){
-				int count = 0;
-				double total = 0;
-				for(int x = -1; x<=1; ++x){
-					for(int y = -1; y<=1; ++y){
-						if((x != 0 || y != 0) && i+x >= 0 && i+x < ySize && j+y >= 0 && j+y < xSize){
-							++count;
-							total += vectors[i+x][j+y].angle;
-						}
-					}
-				}
-				total /= count;
-				vectors[i][j] = total + ((double)rand()/rand.max()*2-1)*change;
-			}
-		}*/
-		for(int i=0; i<ySize; ++i){
-			for(int j=0; j<xSize; ++j){
+			for(int j=0; j<xSize; ++j){ // Update vectors according to noise
 				vectors[i][j].setAngle(perlin(j*axisStep/*+i*frameStep*/, i*axisStep/*+j*frameStep*/, frames*frameStep)*2*pi);
 				// cout << perlin(j*frameStep, i*frameStep, frames*frameStep) << endl;
 			}
 		}
-		particles.update(vectors);
+		particles.update(vectors); // Update particles
 		glBindVertexArray(vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Line)*lineCount, particles.lines);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Line)*lineCount, particles.lines); // Update VBO
 		glDrawArrays(GL_LINES, 0, lineCount*2);
 		glBindVertexArray(0);
 		glfwSwapBuffers(window);
