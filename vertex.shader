@@ -1,3 +1,5 @@
+/** A very simple shader, just doing the bare minimum */
+
 #version 450 core
 layout(location=0) in vec2 position;
 
