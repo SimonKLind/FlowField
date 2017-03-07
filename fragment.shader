@@ -1,3 +1,5 @@
+/** A very simple shader, just draws all black with low opacity */
+
 #version 450 core
 
 void main(){
